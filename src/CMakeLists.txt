@@ -6,7 +6,11 @@ add_executable(Hand
         finger_animator.cpp
         finger_animator.h
         hand_animator.cpp
-        hand_animator.h)
+        hand_animator.h
+        camera.cpp
+        camera.h
+        camera_patroller.cpp
+        camera_patroller.h)
 
 target_link_libraries(Hand PRIVATE assimp::assimp glew_s glm stb glfw)
 target_include_directories(Hand PRIVATE

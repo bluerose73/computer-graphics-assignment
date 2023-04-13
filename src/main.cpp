@@ -22,6 +22,7 @@
 
 #include "hand_animator.h"
 #include "finger_animator.h"
+#include "camera_patroller.h"
 
 namespace SkeletalAnimation {
     const char *vertex_shader_330 =
@@ -69,6 +70,13 @@ static void error_callback(int error, const char *description) {
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+    
+    // Camera Patrol
+    CameraPatroller* camera = (CameraPatroller*) glfwGetWindowUserPointer(window);
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        camera->SetDestination(camera->position_, camera->rotation_);
+    if (key == GLFW_KEY_P && action == GLFW_PRESS)
+        camera->TogglePatrol(glfwGetTime());
 }
 
 static void ProcessHandGestureInput(GLFWwindow* window, HandAnimator* hand_animator){
@@ -93,6 +101,56 @@ static void ProcessHandGestureInput(GLFWwindow* window, HandAnimator* hand_anima
         hand_animator->SetGesture({&straighten, &bend, &bend, 
                                    &bend, &straighten});
     }
+}
+
+static void ProcessCameraKeyboardInput(GLFWwindow* window, Camera* camera, float delta_time) {
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        camera->Move(UP, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        camera->Move(LEFT, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        camera->Move(DOWN, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        camera->Move(RIGHT, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+        camera->ProcessKeyboardRoll(ROLL_LEFT, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+        camera->ProcessKeyboardRoll(ROLL_RIGHT, delta_time);
+    }
+}
+
+static void ProcessCameraMouseButtonInput(GLFWwindow* window, Camera* camera, float delta_time) {
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        camera->Move(FORWARD, delta_time);
+    }
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+        camera->Move(BACKWARD, delta_time);
+    }
+}
+
+static void ProcessCameraCursorPosInput(GLFWwindow* window, Camera* camera) {
+    static int first_mouse = 3;
+    static float last_x, last_y;
+    
+    double xpos_in, ypos_in;
+    glfwGetCursorPos(window, &xpos_in, &ypos_in);
+    float xpos = (float) xpos_in, ypos = (float) ypos_in;
+    if (first_mouse > 0) {
+        last_x = xpos;
+        last_y = ypos;
+        first_mouse--;
+    }
+
+    float xoffset = xpos - last_x;
+    float yoffset = last_y - ypos;
+    last_x = xpos;
+    last_y = ypos;
+    camera->ProcessMouseMovement(xoffset, yoffset);
 }
 
 int main(int argc, char *argv[]) {
@@ -176,9 +234,20 @@ int main(int argc, char *argv[]) {
                        &idle)
     });
 
+    CameraPatroller camera({0.0f, 0.0f, -40.0f}, {0.0f, 0.0f, 1.0f});
+    camera.SetDestination({1.46, 43.47, -12.19}, {0.64, -0.77, 0.04, -0.00});
+    glfwSetWindowUserPointer(window, &camera);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
     glEnable(GL_DEPTH_TEST);
+    int counter  = 0;
+    float delta_time = 0;
+    passed_time = (float) glfwGetTime();
     while (!glfwWindowShouldClose(window)) {
-        passed_time = (float) glfwGetTime();
+        counter ++;
+        float cur_time = (float) glfwGetTime();
+        delta_time = cur_time - passed_time;
+        passed_time = cur_time;
 
         // --- You may edit below ---
 
@@ -187,7 +256,7 @@ int main(int argc, char *argv[]) {
         float metacarpals_angle = passed_time * (M_PI / 4.0f);
         // * target = metacarpals
         // * rotation axis = (1, 0, 0)
-        modifier["metacarpals"] = glm::rotate(glm::identity<glm::mat4>(), metacarpals_angle, glm::fvec3(1.0, 0.0, 0.0));
+        // modifier["metacarpals"] = glm::rotate(glm::identity<glm::mat4>(), metacarpals_angle, glm::fvec3(1.0, 0.0, 0.0));
 
         /**********************************************************************************\
         *
@@ -246,7 +315,12 @@ int main(int argc, char *argv[]) {
         //                                                   glm::fvec3(0.0, 0.0, 1.0));
 
         ProcessHandGestureInput(window, &hand_animator);
+        ProcessCameraKeyboardInput(window, &camera, delta_time);
+        ProcessCameraMouseButtonInput(window, &camera, delta_time);
+        ProcessCameraCursorPosInput(window, &camera);
+
         hand_animator.Update();
+        camera.UpdatePose(passed_time);
 
         // --- You may edit above ---
 
@@ -262,9 +336,13 @@ int main(int argc, char *argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(program);
-        glm::fmat4 mvp = glm::ortho(-12.5f * ratio, 12.5f * ratio, -5.f, 20.f, -20.f, 20.f)
-                         *
-                         glm::lookAt(glm::fvec3(.0f, .0f, -1.f), glm::fvec3(.0f, .0f, .0f), glm::fvec3(.0f, 1.f, .0f));
+        // glm::fmat4 mvp = glm::ortho(-12.5f * ratio, 12.5f * ratio, -5.f, 20.f, -20.f, 20.f)
+        //                  *
+        //                  glm::lookAt(glm::fvec3(.0f, .0f, -1.f), glm::fvec3(.0f, .0f, .0f), glm::fvec3(.0f, 1.f, .0f));
+        glm::fmat4 mvp = camera.GetViewProjection(ratio);
+        // if (counter % 1000 == 0) {
+        //     camera.PrintDebugInfo();
+        // }
         glUniformMatrix4fv(glGetUniformLocation(program, "u_mvp"), 1, GL_FALSE, (const GLfloat *) &mvp);
         glUniform1i(glGetUniformLocation(program, "u_diffuse"), SCENE_RESOURCE_SHADER_DIFFUSE_CHANNEL);
         SkeletalMesh::Scene::SkeletonTransf bonesTransf;
