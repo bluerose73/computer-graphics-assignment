@@ -23,45 +23,9 @@
 #include "hand_animator.h"
 #include "finger_animator.h"
 #include "camera_patroller.h"
-
-namespace SkeletalAnimation {
-    const char *vertex_shader_330 =
-            "#version 330 core\n"
-            "const int MAX_BONES = 100;\n"
-            "uniform mat4 u_bone_transf[MAX_BONES];\n"
-            "uniform mat4 u_mvp;\n"
-            "layout(location = 0) in vec3 in_position;\n"
-            "layout(location = 1) in vec2 in_texcoord;\n"
-            "layout(location = 2) in vec3 in_normal;\n"
-            "layout(location = 3) in ivec4 in_bone_index;\n"
-            "layout(location = 4) in vec4 in_bone_weight;\n"
-            "out vec2 pass_texcoord;\n"
-            "void main() {\n"
-            "    float adjust_factor = 0.0;\n"
-            "    for (int i = 0; i < 4; i++) adjust_factor += in_bone_weight[i] * 0.25;\n"
-            "    mat4 bone_transform = mat4(1.0);\n"
-            "    if (adjust_factor > 1e-3) {\n"
-            "        bone_transform -= bone_transform;\n"
-            "        for (int i = 0; i < 4; i++)\n"
-            "            bone_transform += u_bone_transf[in_bone_index[i]] * in_bone_weight[i] / adjust_factor;\n"
-            "	 }\n"
-            "    gl_Position = u_mvp * bone_transform * vec4(in_position, 1.0);\n"
-            "    pass_texcoord = in_texcoord;\n"
-            "}\n";
-
-    const char *fragment_shader_330 =
-            "#version 330 core\n"
-            "uniform sampler2D u_diffuse;\n"
-            "in vec2 pass_texcoord;\n"
-            "out vec4 out_color;\n"
-            "void main() {\n"
-            #ifdef DIFFUSE_TEXTURE_MAPPING
-            "    out_color = vec4(texture(u_diffuse, pass_texcoord).xyz, 1.0);\n"
-            #else
-            "    out_color = vec4(pass_texcoord, 0.0, 1.0);\n"
-            #endif
-            "}\n";
-}
+#include "light_source.h"
+#include "phong_shader.h"
+#include "particle_generator.h"
 
 static void error_callback(int error, const char *description) {
     fprintf(stderr, "Error: %s\n", description);
@@ -153,6 +117,27 @@ static void ProcessCameraCursorPosInput(GLFWwindow* window, Camera* camera) {
     camera->ProcessMouseMovement(xoffset, yoffset);
 }
 
+static void ProcessLightKeyboardInput(GLFWwindow* window, LightSource* light, float delta_time) {
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+        light->Move(UP, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+        light->Move(LEFT, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+        light->Move(DOWN, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+        light->Move(RIGHT, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) {
+        light->Move(FORWARD, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS) {
+        light->Move(BACKWARD, delta_time);
+    }
+}
+
 int main(int argc, char *argv[]) {
     GLFWwindow *window;
     GLuint vertex_shader, fragment_shader, program;
@@ -184,12 +169,28 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
 
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex_shader, 1, &SkeletalAnimation::vertex_shader_330, NULL);
+    // glShaderSource(vertex_shader, 1, &SkeletalAnimation::vertex_shader_330, NULL);
+    glShaderSource(vertex_shader, 1, &phong_shading::vertex_shader_330, NULL);
     glCompileShader(vertex_shader);
+    int  success;
+    char infoLog[512];
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+    if(!success)
+    {
+        glGetShaderInfoLog(vertex_shader, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+    }
 
     fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader, 1, &SkeletalAnimation::fragment_shader_330, NULL);
+    // glShaderSource(fragment_shader, 1, &SkeletalAnimation::fragment_shader_330, NULL);
+    glShaderSource(fragment_shader, 1, &phong_shading::fragment_shader_330, NULL);
     glCompileShader(fragment_shader);
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
+    if(!success)
+    {
+        glGetShaderInfoLog(fragment_shader, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+    }
 
     program = glCreateProgram();
     glAttachShader(program, vertex_shader);
@@ -239,6 +240,11 @@ int main(int argc, char *argv[]) {
     glfwSetWindowUserPointer(window, &camera);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    // Let particles follow the source.
+    LightSource light_source({0.0f, 0.0f, -35.0f}, {1.0f, 1.0f, 1.0f});
+    ParticleGenerator particles({0.0f, 0.0f, -35.0f}, {0.0f, 10.0f, 0.0f},
+                                {1.0f, 0.5f, 0.0f, 0.2f}, 0.5, 1.0, 5.0, 10000.0, 11000);
+
     glEnable(GL_DEPTH_TEST);
     int counter  = 0;
     float delta_time = 0;
@@ -249,80 +255,18 @@ int main(int argc, char *argv[]) {
         delta_time = cur_time - passed_time;
         passed_time = cur_time;
 
-        // --- You may edit below ---
-
-        // Example: Rotate the hand
-        // * turn around every 4 seconds
         float metacarpals_angle = passed_time * (M_PI / 4.0f);
-        // * target = metacarpals
-        // * rotation axis = (1, 0, 0)
-        // modifier["metacarpals"] = glm::rotate(glm::identity<glm::mat4>(), metacarpals_angle, glm::fvec3(1.0, 0.0, 0.0));
-
-        /**********************************************************************************\
-        *
-        * To animate fingers, modify modifier["HAND_SECTION"] each frame,
-        * where HAND_SECTION can only be one of the bone names in the Hand's Hierarchy.
-        *
-        * A virtual hand's structure is like this: (slightly DIFFERENT from the real world)
-        *    5432 1
-        *    ....        1 = thumb           . = fingertip
-        *    |||| .      2 = index finger    | = distal phalange
-        *    $$$$ |      3 = middle finger   $ = intermediate phalange
-        *    #### $      4 = ring finger     # = proximal phalange
-        *    OOOO#       5 = pinky           O = metacarpals
-        *     OOO
-        * (Hand in the real world -> https://en.wikipedia.org/wiki/Hand)
-        *
-        * From the structure we can infer the Hand's Hierarchy:
-        *	- metacarpals
-        *		- thumb_proximal_phalange
-        *			- thumb_intermediate_phalange
-        *				- thumb_distal_phalange
-        *					- thumb_fingertip
-        *		- index_proximal_phalange
-        *			- index_intermediate_phalange
-        *				- index_distal_phalange
-        *					- index_fingertip
-        *		- middle_proximal_phalange
-        *			- middle_intermediate_phalange
-        *				- middle_distal_phalange
-        *					- middle_fingertip
-        *		- ring_proximal_phalange
-        *			- ring_intermediate_phalange
-        *				- ring_distal_phalange
-        *					- ring_fingertip
-        *		- pinky_proximal_phalange
-        *			- pinky_intermediate_phalange
-        *				- pinky_distal_phalange
-        *					- pinky_fingertip
-        *
-        * Notice that modifier["HAND_SECTION"] is a local transformation matrix,
-        * where (1, 0, 0) is the bone's direction, and apparently (0, 1, 0) / (0, 0, 1)
-        * is perpendicular to the bone.
-        * Particularly, (0, 0, 1) is the rotation axis of the nearer joint.
-        *
-        \**********************************************************************************/
-
-        // // Example: Animate the index finger
-        // // * period = 2.4 seconds
-        // float period = 2.4f;
-        // float time_in_period = fmod(passed_time, period);
-        // // * angle: 0 -> PI/3 -> 0
-        // float thumb_angle = abs(time_in_period / (period * 0.5f) - 1.0f) * (M_PI / 3.0);
-        // // * target = proximal phalange of the index
-        // // * rotation axis = (0, 0, 1)
-        // modifier["index_proximal_phalange"] = glm::rotate(glm::identity<glm::mat4>(), thumb_angle,
-        //                                                   glm::fvec3(0.0, 0.0, 1.0));
 
         ProcessHandGestureInput(window, &hand_animator);
         ProcessCameraKeyboardInput(window, &camera, delta_time);
         ProcessCameraMouseButtonInput(window, &camera, delta_time);
         ProcessCameraCursorPosInput(window, &camera);
+        ProcessLightKeyboardInput(window, &light_source, delta_time);
 
         hand_animator.Update();
         camera.UpdatePose(passed_time);
-
-        // --- You may edit above ---
+        particles.position_ = light_source.position_;
+        particles.Update(delta_time);
 
         float ratio;
         int width, height;
@@ -336,21 +280,28 @@ int main(int argc, char *argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(program);
-        // glm::fmat4 mvp = glm::ortho(-12.5f * ratio, 12.5f * ratio, -5.f, 20.f, -20.f, 20.f)
-        //                  *
-        //                  glm::lookAt(glm::fvec3(.0f, .0f, -1.f), glm::fvec3(.0f, .0f, .0f), glm::fvec3(.0f, 1.f, .0f));
-        glm::fmat4 mvp = camera.GetViewProjection(ratio);
-        // if (counter % 1000 == 0) {
-        //     camera.PrintDebugInfo();
-        // }
-        glUniformMatrix4fv(glGetUniformLocation(program, "u_mvp"), 1, GL_FALSE, (const GLfloat *) &mvp);
+        glm::fmat4 view_projection = camera.GetViewProjection(ratio);
+        if (counter % 10000 == 0) {
+            particles.PrintDebugInfo();
+            // camera.PrintDebugInfo();
+            // printf("lightPos = %f, %f, %f\n", light_source.position_.x, light_source.position_.y, light_source.position_.z);
+            // printf("lightColor = %f, %f, %f\n", light_source.light_color_.x, light_source.light_color_.y, light_source.light_color_.z);
+        }
+        glUniformMatrix4fv(glGetUniformLocation(program, "u_view_projection"), 1, GL_FALSE, (const GLfloat *) &view_projection);
         glUniform1i(glGetUniformLocation(program, "u_diffuse"), SCENE_RESOURCE_SHADER_DIFFUSE_CHANNEL);
+        glUniform3f(glGetUniformLocation(program, "lightPos"),
+                    light_source.position_.x, light_source.position_.y, light_source.position_.z);
+        glUniform3f(glGetUniformLocation(program, "lightColor"),
+                    light_source.light_color_.x, light_source.light_color_.y, light_source.light_color_.z);
+        glUniform3f(glGetUniformLocation(program, "viewPos"), camera.position_.x, camera.position_.y, camera.position_.z);
+
         SkeletalMesh::Scene::SkeletonTransf bonesTransf;
         sr.getSkeletonTransform(bonesTransf, modifier);
         if (!bonesTransf.empty())
             glUniformMatrix4fv(glGetUniformLocation(program, "u_bone_transf"), bonesTransf.size(), GL_FALSE,
                                (float *) bonesTransf.data());
         sr.render();
+        particles.Draw(view_projection, camera.position_);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

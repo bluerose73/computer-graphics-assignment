@@ -10,7 +10,17 @@ add_executable(Hand
         camera.cpp
         camera.h
         camera_patroller.cpp
-        camera_patroller.h)
+        camera_patroller.h
+        movable_object.h
+        movable_object.cpp
+        light_source.h
+        light_source.cpp
+        phong_shader.h
+        particle.h
+        particle.cpp
+        particle_generator.h
+        particle_generator.cpp
+        particle_shader.h)
 
 target_link_libraries(Hand PRIVATE assimp::assimp glew_s glm stb glfw)
 target_include_directories(Hand PRIVATE

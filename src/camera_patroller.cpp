@@ -47,7 +47,7 @@ void CameraPatroller::UpdatePose(float cur_time) {
         float place = 1.0f - abs(time_in_period / (patrol_period_ * 0.5f) - 1.0f);
         position_ = glm::mix(start_position_, dest_position_, place);
         rotation_ = glm::mix(start_orientation_, dest_orientation_, place);
-        UpdateCameraVectors();
+        UpdateDirectionVectors();
     }
 }
 
