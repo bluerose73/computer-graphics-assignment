@@ -97,7 +97,7 @@ void ParticleGenerator::Update(float delta_time) {
                 z = (float) rand() / RAND_MAX;
             } while(x * x + y * y + z * z > 1.0f);
             glm::vec3 position(x * radius_, y * radius_, z * radius_);
-            particles_[i].Set(position_ + position, velocity, color_, life);
+            particles_[i].Set(position, velocity, color_, life);
             num_spawn--;
         }
         if (num_spawn == 0) break;
@@ -112,10 +112,9 @@ static const glm::vec3 STD_RIGHT(1.0f, 0.0f, 0.0f);
 
 void ParticleGenerator::Draw(const glm::mat4& view_projection, const glm::vec3& camera_pos) {
     glm::mat4 view = glm::lookAt(ORIGIN, camera_pos, STD_UP);
-    // glm::mat4 face_camera = glm::toMat4(glm::quat(glm::inverse(view)));
+    glm::mat4 translate = glm::translate(glm::identity<glm::mat4>(), position_);
     glm::mat4 scale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(particle_size_, particle_size_, particle_size_));
-    // glm::mat4 mvp = view_projection * face_camera * scale;
-    glm::mat4 mvp = view_projection * scale;
+    glm::mat4 mvp = view_projection * translate * scale;
     for (int i = 0; i < max_particle_num_; i++) {
         particles_[i].WritePosition(instance_buffer_.get() + INSTANCE_ATTRIB_SIZE * i);
         particles_[i].WriteColor(instance_buffer_.get() + INSTANCE_ATTRIB_SIZE * i + 3);
