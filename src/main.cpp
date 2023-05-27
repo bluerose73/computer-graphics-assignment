@@ -241,8 +241,8 @@ int main(int argc, char *argv[]) {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // Let particles follow the source.
-    LightSource light_source({0.0f, 0.0f, -35.0f}, {1.0f, 1.0f, 1.0f});
-    ParticleGenerator particles({0.0f, 0.0f, -35.0f}, {0.0f, 10.0f, 0.0f},
+    LightSource light_source({0.0f, 0.0f, -30.0f}, {1.0f, 1.0f, 1.0f});
+    ParticleGenerator particles({0.0f, 0.0f, -30.0f}, {0.0f, 10.0f, 0.0f},
                                 {1.0f, 0.5f, 0.0f, 0.2f}, 0.5, 1.0, 5.0, 10000.0, 11000);
 
     glEnable(GL_DEPTH_TEST);

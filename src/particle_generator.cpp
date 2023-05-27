@@ -92,9 +92,9 @@ void ParticleGenerator::Update(float delta_time) {
             // Generate random point within a ball
             float x, y, z;
             do {
-                x = (float) rand() / RAND_MAX;
-                y = (float) rand() / RAND_MAX;
-                z = (float) rand() / RAND_MAX;
+                x = ((float) rand() / RAND_MAX) * 2.0f - 1.0f;
+                y = ((float) rand() / RAND_MAX) * 2.0f - 1.0f;
+                z = ((float) rand() / RAND_MAX) * 2.0f - 1.0f;
             } while(x * x + y * y + z * z > 1.0f);
             glm::vec3 position(x * radius_, y * radius_, z * radius_);
             particles_[i].Set(position, velocity, color_, life);
