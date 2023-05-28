@@ -26,6 +26,7 @@
 #include "light_source.h"
 #include "phong_shader.h"
 #include "particle_generator.h"
+#include "box.h"
 
 static void error_callback(int error, const char *description) {
     fprintf(stderr, "Error: %s\n", description);
@@ -241,9 +242,10 @@ int main(int argc, char *argv[]) {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // Let particles follow the source.
-    LightSource light_source({0.0f, 0.0f, -30.0f}, {1.0f, 1.0f, 1.0f});
-    ParticleGenerator particles({0.0f, 0.0f, -30.0f}, {0.0f, 10.0f, 0.0f},
-                                {1.0f, 0.5f, 0.0f, 0.2f}, 0.5, 1.0, 5.0, 10000.0, 11000);
+    LightSource light_source({10.0f, 10.0f, -25.0f}, {1.0f, 1.0f, 1.0f});
+    ParticleGenerator particles({10.0f, 10.0f, -25.0f}, {0.0f, 10.0f, 0.0f},
+                                {1.0f, 0.5f, 0.0f, 0.2f}, 0.5, 1.0, 5.0, 4000.0, 4096);
+    Box box({0.0f, 0.0f, -15.0f}, 5.0f);
 
     glEnable(GL_DEPTH_TEST);
     int counter  = 0;
@@ -301,6 +303,7 @@ int main(int argc, char *argv[]) {
             glUniformMatrix4fv(glGetUniformLocation(program, "u_bone_transf"), bonesTransf.size(), GL_FALSE,
                                (float *) bonesTransf.data());
         sr.render();
+        box.Draw(view_projection, camera.position_, light_source.light_color_, light_source.position_);
         particles.Draw(view_projection, camera.position_);
 
         glfwSwapBuffers(window);

@@ -20,7 +20,10 @@ add_executable(Hand
         particle.cpp
         particle_generator.h
         particle_generator.cpp
-        particle_shader.h)
+        particle_shader.h
+        box.h
+        box.cpp
+        normal_map_shader.h)
 
 target_link_libraries(Hand PRIVATE assimp::assimp glew_s glm stb glfw)
 target_include_directories(Hand PRIVATE
